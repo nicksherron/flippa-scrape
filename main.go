@@ -5,36 +5,27 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gin-contrib/gzip"
-	"github.com/gin-gonic/gin"
-	_ "github.com/heroku/x/hmetrics/onload"
 	"github.com/gin-contrib/cache"
 	"github.com/gin-contrib/cache/persistence"
+	"github.com/gin-contrib/gzip"
+	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
+	_ "github.com/heroku/x/hmetrics/onload"
 	"github.com/icrowley/fake"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"log"
-	"github.com/go-redis/redis"
 	"net/http"
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 )
 
 type Flippa struct {
-	//Meta struct {
-	//	PageNumber   int `json:"page_number"`
-	//	PageSize     int `json:"page_size"`
-	//	TotalResults int `json:"total_results"`
-	//} `json:"meta"`
-	//Links struct {
-	//	Prev interface{} `json:"prev"`
-	//	Next string      `json:"next"`
-	//} `json:"links"`
 	Data []struct {
 		Type                  string        `json:"type"`
 		ID                    string        `json:"id"`
@@ -69,46 +60,6 @@ type Flippa struct {
 		Title                 string        `json:"title"`
 		UniquesPerMonth       interface{}   `json:"uniques_per_month"`
 		Watching              bool          `json:"watching"`
-		//Images                struct {
-		//	Thumbnail struct {
-		//		URL     string        `json:"url"`
-		//		Targets []interface{} `json:"targets"`
-		//	} `json:"thumbnail"`
-		//} `json:"images"`
-		//Relationships struct {
-		//	Seller struct {
-		//		Data struct {
-		//			Type string `json:"type"`
-		//			ID   string `json:"id"`
-		//		} `json:"data"`
-		//		Links struct {
-		//			Self string `json:"self"`
-		//		} `json:"links"`
-		//	} `json:"seller"`
-		//	TagsSiteType struct {
-		//		Links struct {
-		//			Self string `json:"self"`
-		//		} `json:"links"`
-		//	} `json:"tags_site_type"`
-		//	CategoriesTopLevel struct {
-		//		Links struct {
-		//			Self string `json:"self"`
-		//		} `json:"links"`
-		//	} `json:"categories_top_level"`
-		//	Upgrades struct {
-		//		Links struct {
-		//			Self string `json:"self"`
-		//		} `json:"links"`
-		//	} `json:"upgrades"`
-		//	TagsMonetization struct {
-		//		Links struct {
-		//			Self string `json:"self"`
-		//		} `json:"links"`
-		//	} `json:"tags_monetization"`
-		//} `json:"relationships"`
-		//Links struct {
-		//	Self string `json:"self"`
-		//} `json:"links"`
 	} `json:"data"`
 }
 
@@ -127,6 +78,7 @@ type Mlog struct{
 }
 
 var wg sync.WaitGroup
+
 var flattened = make(map[string]interface{})
 
 var aggregate = []bson.M{{"$project": bson.M{"_id": 0.0, "Name": "$propertyname",
@@ -369,11 +321,6 @@ func jsonHeader() gin.HandlerFunc {
 
 func rest(session *mgo.Session, c *gin.Context) {
 
-	mongoUrl := os.Getenv("MONGODB_URI")
-	session, err := mgo.Dial(mongoUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
 	sessionCopy := session.Copy()
 
 	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
@@ -381,7 +328,7 @@ func rest(session *mgo.Session, c *gin.Context) {
 	var data []bson.M
 	pipe := m.Pipe(aggregate)
 
-	err = pipe.All(&data)
+	err := pipe.All(&data)
 
 	b, err := json.MarshalIndent(data, "", "  ")
 
