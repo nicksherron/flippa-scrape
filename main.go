@@ -205,10 +205,11 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	//router.Use(gin.Logger())
-	router.Use(mongoLogger(session))
 	router.LoadHTMLGlob("static/*html")
 
 	router.Static("/static", "./static")
+
+	router.Use(mongoLogger(session))
 
 	router.GET("/", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour, func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl.html", nil)
