@@ -184,6 +184,8 @@ func main() {
 
 	router.GET("/nocache", rest)
 
+	router.GET("/count", count)
+
 	router.GET("/csv", mongocsv)
 
 	router.GET("/db", func(context *gin.Context) {
