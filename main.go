@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"strings"
 )
 
 type Flippa struct {
@@ -185,19 +186,17 @@ func main() {
 	// cache time in hours
 	hours := 12
 
-	store := persistence.NewRedisCache(redisUrl, "", time.Duration(hours)*time.Hour)
+	splitRedis := strings.Split(strings.Replace(redisUrl,"redis://rediscloud:", "",1), "@")
+	redisPassword := splitRedis[0]
+	redisBaseUrl := splitRedis[1]
+
+	store := persistence.NewRedisCache(redisBaseUrl, redisPassword, time.Duration(hours)*time.Hour)
 
 	redisOptions, err := redis.ParseURL(redisUrl)
 	if redisUrl == "" {
 		log.Fatal("redis client connect failure")
 	}
-
 	client := redis.NewClient(redisOptions)
-	//client := redis.NewClient(&redis.Options{
-	//	Addr:     "redis-12358.c17.us-east-1-4.ec2.cloud.redislabs.com:12358",
-	//	Password: "Z5EsFsD2ktL9Ts5UFP4qVKTQHqnPUzpH", // no password set
-	//	DB:       0,                                  // use default DB
-	//})
 
 	if err != nil {
 		log.Fatal(err)
