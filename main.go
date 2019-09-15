@@ -63,7 +63,7 @@ type Flippa struct {
 	} `json:"data"`
 }
 
-type Mlog struct{
+type Mlog struct {
 	ID         bson.ObjectId `bson:"_id,omitempty"`
 	Path       string
 	Query      string
@@ -128,7 +128,6 @@ func main() {
 	}
 	session, err := mgo.Dial(m)
 
-
 	redisUrl := os.Getenv("REDISCLOUD_URL")
 
 	if redisUrl == "" {
@@ -138,7 +137,7 @@ func main() {
 	// cache time in hours
 	hours := 12
 
-	splitRedis := strings.Split(strings.Replace(redisUrl,"redis://rediscloud:", "",1), "@")
+	splitRedis := strings.Split(strings.Replace(redisUrl, "redis://rediscloud:", "", 1), "@")
 	redisPassword := splitRedis[0]
 	redisBaseUrl := splitRedis[1]
 
@@ -171,11 +170,11 @@ func main() {
 		client.FlushAll()
 	})
 
-	router.GET("/count", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour,  func(c *gin.Context){
+	router.GET("/count", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour, func(c *gin.Context) {
 		count(session, c)
 	}))
 
-	router.GET("/csv", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour,  func(c *gin.Context){
+	router.GET("/csv", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour, func(c *gin.Context) {
 		mongocsv(session, c)
 	}))
 
@@ -230,7 +229,7 @@ func main() {
 		c.Redirect(307, "/")
 	})
 
-	router.GET("/api", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour,  func(c *gin.Context) {
+	router.GET("/api", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour, func(c *gin.Context) {
 		router.Use(gzip.Gzip(gzip.BestCompression))
 		router.Use(jsonHeader())
 		rest(session, c)
@@ -456,7 +455,6 @@ func mongocsv(session *mgo.Session, c *gin.Context) {
 		skip = 0
 	}
 
-
 	var docs []bson.M
 
 	err = m.Find(nil).Skip(skip).Limit(limit).Select(bson.M{
@@ -591,7 +589,7 @@ func count(session *mgo.Session, c *gin.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	sessionCopy := session.Copy()
 	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
