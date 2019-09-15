@@ -150,13 +150,8 @@ var aggregate = []bson.M{{"$project": bson.M{"_id": 0.0, "Name": "$propertyname"
 			"date":   "$endsat"}}}}}
 
 func main() {
-	port := os.Getenv("PORT")
 
 	flag.Parse()
-
-	if port == "" {
-		log.Fatal("$PORT must be set")
-	}
 
 	tlsConfig := &tls.Config{}
 
@@ -243,11 +238,12 @@ func main() {
 	router.Use(jsonHeader())
 	router.GET("/api", rest)
 
-	err = router.Run(":" + port)
-
-	if err != nil {
-		log.Fatal(err)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
 	}
+	// listen on server 0.0.0.0:$PORT
+	router.Run("0.0.0.0:" + port)
 
 }
 
