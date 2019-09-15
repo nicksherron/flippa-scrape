@@ -1,0 +1,8 @@
+{
+  "name": "Flippa scrape app",
+  "description": "This was made for an upwork project I worked on. It scrapes Flippa and stores results in mongodb that can downloaded to csv from url ",
+  "keywords": [
+  ],
+  "website": "https://github.com/nsherron90/flippa-scrape",
+  "repository": "https://github.com/nsherron90/flippa-scrape"
+}
