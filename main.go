@@ -308,7 +308,7 @@ func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session, db bool) {
 		//var format Doc
 
 		sessionCopy := session.Copy()
-		c := sessionCopy.DB("data").C("flippa_data")
+		c := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
 		for _, v := range data.Data {
 			update := bson.M{"id": v.ID}
@@ -353,7 +353,7 @@ func rest(c *gin.Context) {
 
 	sessionCopy := session.Copy()
 
-	m := sessionCopy.DB("data").C("flippa_data")
+	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
 	var data []bson.M
 	pipe := m.Pipe(aggregate)
@@ -456,7 +456,7 @@ func mongocsv(c *gin.Context) {
 	}
 
 	sessionCopy := session.Copy()
-	m := sessionCopy.DB("data").C("flippa_data")
+	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
 	var headers []string
 
@@ -595,7 +595,7 @@ func download(c *gin.Context) {
 	session, err := mgo.Dial(mongoUrl)
 
 	sessionCopy := session.Copy()
-	m := sessionCopy.DB("data").C("flippa_data")
+	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
 	var headers []string
 
@@ -694,7 +694,7 @@ func count(c *gin.Context) {
 	}
 	
 	sessionCopy := session.Copy()
-	m := sessionCopy.DB("data").C("flippa_data")
+	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
 	n, err := m.Count()
 
