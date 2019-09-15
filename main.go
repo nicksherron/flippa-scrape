@@ -108,6 +108,20 @@ type Flippa struct {
 	} `json:"data"`
 }
 
+type Mlog struct{
+	ID         bson.ObjectId `bson:"_id,omitempty"`
+	Path       string
+	Query      string
+	Timestamp  time.Time
+	Duration   time.Duration
+	Method     string
+	StatusCode int
+	ClientIP   string
+	UserAgent  string
+	Referrer   string
+	Size       int
+}
+
 
 var wg sync.WaitGroup
 var dbsend = flag.Bool("db", true, "send to mongodb")
@@ -181,12 +195,13 @@ func main() {
 	}
 
 	gin.SetMode(gin.ReleaseMode)
-	router := gin.New()
-	router.Use(gin.Logger())
+	router := gin.Default()
+	//router.Use(gin.Logger())
+	router.Use(mongoLogger())
 	router.LoadHTMLGlob("static/*html")
 
 	router.Static("/static", "./static")
-	
+
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl.html", nil)
 	})
@@ -712,4 +727,57 @@ func count(c *gin.Context) {
 		log.Fatal(err)
 	}
 
+}
+
+func mongoLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		start := time.Now()
+		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+		c.Next()
+		duration := time.Now().Sub(start)
+		method := c.Request.Method
+		statusCode := c.Writer.Status()
+		clientIP := c.ClientIP()
+		userAgent := c.Request.UserAgent()
+		referrer := c.Request.Referer()
+		size := c.Writer.Size()
+
+		fmt.Println(clientIP)
+		//
+		//logs := []bson.M{{
+		//	"path": path,
+		//	"query": query,
+		//	"timestamp": timestamp,
+		//	"duration": duration,
+		//	"method": method,
+		//	"statusCode": statusCode,
+		//	"clientIP": clientIP,
+		//	"userAgent": userAgent,
+		//	"referrer": referrer,
+		//	"size":size}}
+		//
+		//fmt.Printf(logs)
+
+		mongoUrl := os.Getenv("MONGODB_URI")
+		session, err := mgo.Dial(mongoUrl)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		m := session.DB("heroku_5rdx8xtc").C("logs")
+		//err =  m.Insert(logs)
+
+		err = m.Insert(&Mlog{Path: path, Query: query, Timestamp: time.Now(), Duration: duration,
+			Method: method, StatusCode: statusCode, ClientIP: clientIP,
+			UserAgent: userAgent, Referrer: referrer, Size: size})
+
+		//not serious enough to fatal
+		if err != nil {
+			fmt.Printf("mongo logging error")
+		}
+		fmt.Println(err)
+	}
 }
