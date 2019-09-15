@@ -14,7 +14,7 @@ require (
 	github.com/mailru/easyjson v0.7.0
 	github.com/mattn/go-isatty v0.0.9
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
-	github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742
+	github.com/modern-go/reflect2 v1.0.1
 	github.com/ugorji/go v1.1.7
 	golang.org/x/sys v0.0.0-20190913121621-c3b328c6e5a7
 	gopkg.in/go-playground/validator.v8 v8.18.2
