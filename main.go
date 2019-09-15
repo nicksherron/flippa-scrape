@@ -8,11 +8,14 @@ import (
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	_ "github.com/heroku/x/hmetrics/onload"
+	"github.com/gin-contrib/cache"
+	"github.com/gin-contrib/cache/persistence"
 	"github.com/icrowley/fake"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"log"
+	"github.com/go-redis/redis"
 	"net/http"
 	"os"
 	"sort"
@@ -170,9 +173,31 @@ func main() {
 	if m == "" {
 		log.Fatal("no Mongodb")
 	}
-
 	session, err := mgo.Dial(m)
 
+
+	redisUrl := os.Getenv("REDISCLOUD_URL")
+
+	if redisUrl == "" {
+		log.Fatal("no redisUrl")
+	}
+
+	// cache time in hours
+	hours := 12
+
+	store := persistence.NewRedisCache(redisUrl, "", time.Duration(hours)*time.Hour)
+
+	redisOptions, err := redis.ParseURL(redisUrl)
+	if redisUrl == "" {
+		log.Fatal("redis client connect failure")
+	}
+
+	client := redis.NewClient(redisOptions)
+	//client := redis.NewClient(&redis.Options{
+	//	Addr:     "redis-12358.c17.us-east-1-4.ec2.cloud.redislabs.com:12358",
+	//	Password: "Z5EsFsD2ktL9Ts5UFP4qVKTQHqnPUzpH", // no password set
+	//	DB:       0,                                  // use default DB
+	//})
 
 	if err != nil {
 		log.Fatal(err)
@@ -186,17 +211,21 @@ func main() {
 
 	router.Static("/static", "./static")
 
-	router.GET("/", func(c *gin.Context) {
+	router.GET("/", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour, func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.tmpl.html", nil)
+	}))
+
+	router.GET("/cache-clear", func(c *gin.Context) {
+		client.FlushAll()
 	})
 
-	router.GET("/count",  func(c *gin.Context){
+	router.GET("/count", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour,  func(c *gin.Context){
 		count(session, c)
-	})
+	}))
 
-	router.GET("/csv", func(c *gin.Context){
+	router.GET("/csv", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour,  func(c *gin.Context){
 		mongocsv(session, c)
-	})
+	}))
 
 	router.GET("/db", func(c *gin.Context) {
 
@@ -224,6 +253,7 @@ func main() {
 				go crawl(uri, &wg, session)
 			}
 			wg.Wait()
+			client.FlushAll()
 			download(session)
 		}()
 
@@ -248,11 +278,11 @@ func main() {
 		c.Redirect(307, "/")
 	})
 
-	router.GET("/api", func(c *gin.Context) {
+	router.GET("/api", cache.CachePageWithoutHeader(store, time.Duration(hours)*time.Hour,  func(c *gin.Context) {
 		router.Use(gzip.Gzip(gzip.BestCompression))
 		router.Use(jsonHeader())
 		rest(session, c)
-	})
+	}))
 
 	port := os.Getenv("PORT")
 	if port == "" {

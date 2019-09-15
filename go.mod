@@ -4,8 +4,10 @@ go 1.12
 
 require (
 	github.com/corpix/uarand v0.1.1 // indirect
+	github.com/gin-contrib/cache v1.1.0
 	github.com/gin-contrib/gzip v0.0.1
 	github.com/gin-gonic/gin v1.4.0
+	github.com/go-redis/redis v6.15.5+incompatible
 	github.com/heroku/x v0.0.9
 	github.com/icrowley/fake v0.0.0-20180203215853-4178557ae428
 	github.com/mailru/easyjson v0.7.0
