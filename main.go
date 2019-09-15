@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/csv"
 	"encoding/json"
 	"flag"
@@ -14,7 +13,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"sort"
@@ -153,21 +151,34 @@ func main() {
 
 	flag.Parse()
 
-	tlsConfig := &tls.Config{}
+	//tlsConfig := &tls.Config{}
 
-	mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
+	m := os.Getenv("MONGODB_URI")
+
+	if m == "" {
+		log.Fatal("no Mongodb")
+	}
+
+	session, err := mgo.Dial(m)
+
+	//mongoUrl, err := mgo.ParseURL(m)
+	//
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//	return conn, err
+	//}
+	//session, err := mgo.DialWithInfo(mongoUrl)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-		conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-		return conn, err
-	}
-	session, err := mgo.DialWithInfo(mongoUrl)
-
-
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -242,8 +253,13 @@ func main() {
 	if port == "" {
 		port = "3000"
 	}
+
+	fmt.Printf("running on port %s", port)
 	// listen on server 0.0.0.0:$PORT
-	router.Run("0.0.0.0:" + port)
+	err = router.Run("0.0.0.0:" + port)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }
 
@@ -265,7 +281,7 @@ func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session, db bool) {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 
 	defer resp.Body.Close()
@@ -300,7 +316,7 @@ func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session, db bool) {
 
 			if err != nil {
 				//fmt.Println("fucking insert error")
-				fmt.Println(err)
+				log.Fatal(err)
 			}
 
 		}
@@ -318,19 +334,22 @@ func jsonHeader() gin.HandlerFunc {
 
 func rest(c *gin.Context) {
 
-	tlsConfig := &tls.Config{}
+	//tlsConfig := &tls.Config{}
 
-	mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
+	//mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
+	//
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
+	//	return conn, err
+	//}
+	//session, err := mgo.DialWithInfo(mongoUrl)
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-		conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-		return conn, err
-	}
-	session, err := mgo.DialWithInfo(mongoUrl)
+	mongoUrl := os.Getenv("MONGODB_URI")
+	session, err := mgo.Dial(mongoUrl)
 
 	sessionCopy := session.Copy()
 
@@ -415,19 +434,26 @@ func mongocsv(c *gin.Context) {
 
 	time.Local = time.UTC
 
-	tlsConfig := &tls.Config{}
+	//tlsConfig := &tls.Config{}
+	//
+	//mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
+	//
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
+	//	return conn, err
+	//}
+	//session, err := mgo.DialWithInfo(mongoUrl)
 
-	mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
+	mongoUrl := os.Getenv("MONGODB_URI")
+	session, err := mgo.Dial(mongoUrl)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-		conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-		return conn, err
-	}
-	session, err := mgo.DialWithInfo(mongoUrl)
 
 	sessionCopy := session.Copy()
 	m := sessionCopy.DB("data").C("flippa_data")
@@ -472,6 +498,9 @@ func mongocsv(c *gin.Context) {
 	} else {
 		limit = 1000
 	}
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var skip int
 	if s, err := strconv.Atoi(c.Query("skip")); err == nil {
@@ -485,6 +514,9 @@ func mongocsv(c *gin.Context) {
 		skip = 0
 	}
 
+	if err != nil {
+		log.Fatal(err)
+	}
 	var docs []bson.M
 
 	// Create a cursor using Find query
@@ -543,21 +575,24 @@ func download(c *gin.Context) {
 
 	time.Local = time.UTC
 
-	tlsConfig := &tls.Config{}
+	//tlsConfig := &tls.Config{}
+	//
+	//dialInfo := &mgo.DialInfo{
+	//	Addrs: []string{"upwork-shard-00-00-n65o2.mongodb.net:27017",
+	//		"upwork-shard-00-01-n65o2.mongodb.net:27017",
+	//		"upwork-shard-00-02-n65o2.mongodb.net:27017"},
+	//	Database: "admin",
+	//	Username: "nick",
+	//	Password: "tjNbspWK4LIVHSd9",
+	//}
+	//dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
+	//	return conn, err
+	//}
+	//session, err := mgo.DialWithInfo(dialInfo)
 
-	dialInfo := &mgo.DialInfo{
-		Addrs: []string{"upwork-shard-00-00-n65o2.mongodb.net:27017",
-			"upwork-shard-00-01-n65o2.mongodb.net:27017",
-			"upwork-shard-00-02-n65o2.mongodb.net:27017"},
-		Database: "admin",
-		Username: "nick",
-		Password: "tjNbspWK4LIVHSd9",
-	}
-	dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-		conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-		return conn, err
-	}
-	session, err := mgo.DialWithInfo(dialInfo)
+	mongoUrl := os.Getenv("MONGODB_URI")
+	session, err := mgo.Dial(mongoUrl)
 
 	sessionCopy := session.Copy()
 	m := sessionCopy.DB("data").C("flippa_data")
@@ -637,20 +672,27 @@ func download(c *gin.Context) {
 
 func count(c *gin.Context) {
 
-	tlsConfig := &tls.Config{}
+	//tlsConfig := &tls.Config{}
+	//
+	//mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
+	//
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
+	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
+	//	return conn, err
+	//}
+	//session, err := mgo.DialWithInfo(mongoUrl)
 
-	mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
+	mongoUrl := os.Getenv("MONGODB_URI")
+	session, err := mgo.Dial(mongoUrl)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-		conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-		return conn, err
-	}
-	session, err := mgo.DialWithInfo(mongoUrl)
-
+	
 	sessionCopy := session.Copy()
 	m := sessionCopy.DB("data").C("flippa_data")
 
