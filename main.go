@@ -289,7 +289,12 @@ func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session) {
 		log.Fatal(err)
 	}
 
-	defer resp.Body.Close()
+	defer func() {
+		err = resp.Body.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	if resp.StatusCode == 200 {
 
@@ -336,7 +341,9 @@ func rest(session *mgo.Session, c *gin.Context) {
 
 	mongoUrl := os.Getenv("MONGODB_URI")
 	session, err := mgo.Dial(mongoUrl)
-
+	if err != nil {
+		log.Fatal(err)
+	}
 	sessionCopy := session.Copy()
 
 	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
@@ -518,7 +525,12 @@ func download(session *mgo.Session) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
 
 	// Create Writer
 	writer := csv.NewWriter(file)
@@ -636,18 +648,12 @@ func mongoLogger(session *mgo.Session) gin.HandlerFunc {
 		referrer := c.Request.Referer()
 		size := c.Writer.Size()
 
+		sessionCopy := session.Copy()
 
-		mongoUrl := os.Getenv("MONGODB_URI")
-		session, err := mgo.Dial(mongoUrl)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		m := session.DB("heroku_5rdx8xtc").C("logs")
+		m := sessionCopy.DB("heroku_5rdx8xtc").C("logs")
 		//err =  m.Insert(logs)
 
-		err = m.Insert(&Mlog{Path: path, Query: query, Timestamp: time.Now(), Duration: duration,
+		err := m.Insert(&Mlog{Path: path, Query: query, Timestamp: time.Now(), Duration: duration,
 			Method: method, StatusCode: statusCode, ClientIP: clientIP,
 			UserAgent: userAgent, Referrer: referrer, Size: size})
 
