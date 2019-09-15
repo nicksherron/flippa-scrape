@@ -1,1 +1,1 @@
-web: bin/flippa-scrape
+web: flippa-scrape
