@@ -122,9 +122,7 @@ type Mlog struct{
 	Size       int
 }
 
-
 var wg sync.WaitGroup
-var dbsend = flag.Bool("db", true, "send to mongodb")
 var flattened = make(map[string]interface{})
 
 var aggregate = []bson.M{{"$project": bson.M{"_id": 0.0, "Name": "$propertyname",
@@ -175,20 +173,6 @@ func main() {
 
 	session, err := mgo.Dial(m)
 
-	//mongoUrl, err := mgo.ParseURL(m)
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//	return conn, err
-	//}
-	//session, err := mgo.DialWithInfo(mongoUrl)
 
 	if err != nil {
 		log.Fatal(err)
@@ -197,7 +181,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	//router.Use(gin.Logger())
-	router.Use(mongoLogger())
+	router.Use(mongoLogger(session))
 	router.LoadHTMLGlob("static/*html")
 
 	router.Static("/static", "./static")
@@ -206,20 +190,21 @@ func main() {
 		c.HTML(http.StatusOK, "index.tmpl.html", nil)
 	})
 
-	router.GET("/nocache", rest)
+	router.GET("/count",  func(c *gin.Context){
+		count(session, c)
+	})
 
-	router.GET("/count", count)
+	router.GET("/csv", func(c *gin.Context){
+		mongocsv(session, c)
+	})
 
-	router.GET("/csv", mongocsv)
+	router.GET("/db", func(c *gin.Context) {
 
-	router.GET("/db", func(context *gin.Context) {
-
-		context.Redirect(307, "/")
+		c.Redirect(307, "/")
 
 		if err != nil {
 			log.Fatal(err)
 		}
-		db := *dbsend
 
 		go func() {
 
@@ -236,10 +221,10 @@ func main() {
 
 				time.Sleep(1 * time.Second)
 
-				go crawl(uri, &wg, session, db)
+				go crawl(uri, &wg, session)
 			}
 			wg.Wait()
-			download(context)
+			download(session)
 		}()
 
 	})
@@ -249,23 +234,25 @@ func main() {
 
 	})
 
-	router.GET("/download", func(context *gin.Context) {
+	router.GET("/download", func(c *gin.Context) {
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		go func() {
-			download(context)
+			download(session)
 
 		}()
 
-		context.Redirect(307, "/")
+		c.Redirect(307, "/")
 	})
 
-	router.Use(gzip.Gzip(gzip.BestCompression))
-	router.Use(jsonHeader())
-	router.GET("/api", rest)
+	router.GET("/api", func(c *gin.Context) {
+		router.Use(gzip.Gzip(gzip.BestCompression))
+		router.Use(jsonHeader())
+		rest(session, c)
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -281,7 +268,7 @@ func main() {
 
 }
 
-func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session, db bool) {
+func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session) {
 	defer wg.Done()
 
 	client := http.Client{}
@@ -321,10 +308,6 @@ func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session, db bool) {
 			log.Fatal(err)
 		}
 
-		//update := bson.M{"id": v.ID}
-
-		//var format Doc
-
 		sessionCopy := session.Copy()
 		c := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
@@ -333,7 +316,6 @@ func crawl(uri string, wg *sync.WaitGroup, session *mgo.Session, db bool) {
 			_, err := c.Upsert(update, v)
 
 			if err != nil {
-				//fmt.Println("fucking insert error")
 				log.Fatal(err)
 			}
 
@@ -350,21 +332,7 @@ func jsonHeader() gin.HandlerFunc {
 	}
 }
 
-func rest(c *gin.Context) {
-
-	//tlsConfig := &tls.Config{}
-
-	//mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-	//	return conn, err
-	//}
-	//session, err := mgo.DialWithInfo(mongoUrl)
+func rest(session *mgo.Session, c *gin.Context) {
 
 	mongoUrl := os.Getenv("MONGODB_URI")
 	session, err := mgo.Dial(mongoUrl)
@@ -432,18 +400,7 @@ func flatten(input bson.M, lkey string, flattened *map[string]interface{}) {
 	}
 }
 
-func mongocsv(c *gin.Context) {
-
-	//// After cmd flag parse
-	//file, err := os.Create("flippa.csv")
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//defer file.Close()
-	//
-	//// Create Writer
-	//writer := csv.NewWriter(file)
+func mongocsv(session *mgo.Session, c *gin.Context) {
 
 	out := c.Writer
 
@@ -451,20 +408,6 @@ func mongocsv(c *gin.Context) {
 	writer := csv.NewWriter(out)
 
 	time.Local = time.UTC
-
-	//tlsConfig := &tls.Config{}
-	//
-	//mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-	//	return conn, err
-	//}
-	//session, err := mgo.DialWithInfo(mongoUrl)
 
 	mongoUrl := os.Getenv("MONGODB_URI")
 	session, err := mgo.Dial(mongoUrl)
@@ -516,9 +459,6 @@ func mongocsv(c *gin.Context) {
 	} else {
 		limit = 1000
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	var skip int
 	if s, err := strconv.Atoi(c.Query("skip")); err == nil {
@@ -532,16 +472,8 @@ func mongocsv(c *gin.Context) {
 		skip = 0
 	}
 
-	if err != nil {
-		log.Fatal(err)
-	}
-	var docs []bson.M
 
-	// Create a cursor using Find query
-	//cursor := m.Find(nil).Skip(skip).Limit(limit).Select(bson.M{
-	//	"_id": 0,
-	//
-	//}).All(&docs)
+	var docs []bson.M
 
 	err = m.Find(nil).Skip(skip).Limit(limit).Select(bson.M{
 		"_id": 0,
@@ -579,7 +511,7 @@ func mongocsv(c *gin.Context) {
 
 }
 
-func download(c *gin.Context) {
+func download(session *mgo.Session) {
 
 	// After cmd flag parse
 	file, err := os.Create("./static/data/flippa.csv")
@@ -593,25 +525,6 @@ func download(c *gin.Context) {
 
 	time.Local = time.UTC
 
-	//tlsConfig := &tls.Config{}
-	//
-	//dialInfo := &mgo.DialInfo{
-	//	Addrs: []string{"upwork-shard-00-00-n65o2.mongodb.net:27017",
-	//		"upwork-shard-00-01-n65o2.mongodb.net:27017",
-	//		"upwork-shard-00-02-n65o2.mongodb.net:27017"},
-	//	Database: "admin",
-	//	Username: "nick",
-	//	Password: "tjNbspWK4LIVHSd9",
-	//}
-	//dialInfo.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-	//	return conn, err
-	//}
-	//session, err := mgo.DialWithInfo(dialInfo)
-
-	mongoUrl := os.Getenv("MONGODB_URI")
-	session, err := mgo.Dial(mongoUrl)
-
 	sessionCopy := session.Copy()
 	m := sessionCopy.DB("heroku_5rdx8xtc").C("flippa_data")
 
@@ -620,13 +533,6 @@ func download(c *gin.Context) {
 	// Auto Detect Headerline
 
 	var h bson.M
-	//err = m.Find(nil).Select(bson.M{
-	//	"_id": 0,
-	//
-	//}).One(&h)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
 
 	pipe := m.Pipe(aggregate)
 	err = pipe.One(&h)
@@ -688,21 +594,7 @@ func download(c *gin.Context) {
 
 }
 
-func count(c *gin.Context) {
-
-	//tlsConfig := &tls.Config{}
-	//
-	//mongoUrl, err := mgo.ParseURL(os.Getenv("MONGODB_URL"))
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//mongoUrl.DialServer = func(addr *mgo.ServerAddr) (net.Conn, error) {
-	//	conn, err := tls.Dial("tcp", addr.String(), tlsConfig)
-	//	return conn, err
-	//}
-	//session, err := mgo.DialWithInfo(mongoUrl)
+func count(session *mgo.Session, c *gin.Context) {
 
 	mongoUrl := os.Getenv("MONGODB_URI")
 	session, err := mgo.Dial(mongoUrl)
@@ -729,7 +621,7 @@ func count(c *gin.Context) {
 
 }
 
-func mongoLogger() gin.HandlerFunc {
+func mongoLogger(session *mgo.Session) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		start := time.Now()
@@ -744,21 +636,6 @@ func mongoLogger() gin.HandlerFunc {
 		referrer := c.Request.Referer()
 		size := c.Writer.Size()
 
-		fmt.Println(clientIP)
-		//
-		//logs := []bson.M{{
-		//	"path": path,
-		//	"query": query,
-		//	"timestamp": timestamp,
-		//	"duration": duration,
-		//	"method": method,
-		//	"statusCode": statusCode,
-		//	"clientIP": clientIP,
-		//	"userAgent": userAgent,
-		//	"referrer": referrer,
-		//	"size":size}}
-		//
-		//fmt.Printf(logs)
 
 		mongoUrl := os.Getenv("MONGODB_URI")
 		session, err := mgo.Dial(mongoUrl)
