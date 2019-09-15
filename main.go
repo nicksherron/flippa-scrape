@@ -186,7 +186,10 @@ func main() {
 	router.LoadHTMLGlob("static/*html")
 
 	router.Static("/static", "./static")
-
+	
+	router.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.tmpl.html", nil)
+	})
 
 	router.GET("/nocache", rest)
 
